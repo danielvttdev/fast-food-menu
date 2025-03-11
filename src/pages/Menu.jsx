@@ -23,30 +23,41 @@ const Menu = () => {
   useEffect(() => {
     const loadMenuData = () => {
       try {
+        console.log('Intentando cargar datos del menú...');
         // Intentamos obtener los datos del localStorage
         const savedMenu = localStorage.getItem('menuData');
         if (savedMenu) {
+          console.log('Datos encontrados en localStorage');
           const parsedMenu = JSON.parse(savedMenu);
-          console.log('Cargando menú desde localStorage:', parsedMenu);
           
-          // Check if the data has the new format with timestamp and data properties
-          const menuData = parsedMenu.data || parsedMenu; // Handle both new and old format
+          // Verificar si los datos tienen el formato correcto
+          const menuDataToUse = parsedMenu.data || parsedMenu;
           
-          setCategories(menuData);
-          if (!selectedCategory) {
-            setSelectedCategory(menuData[0]?.id || null);
+          if (Array.isArray(menuDataToUse) && menuDataToUse.length > 0) {
+            console.log('Datos válidos encontrados:', menuDataToUse.map(c => c.name));
+            setCategories(menuDataToUse);
+            if (!selectedCategory) {
+              setSelectedCategory(menuDataToUse[0]?.id || null);
+            }
+          } else {
+            console.log('Datos en localStorage no válidos, usando menuData por defecto');
+            setCategories(menuData);
+            if (!selectedCategory) {
+              setSelectedCategory(menuData[0]?.id || null);
+            }
           }
-          // Actualizamos el timestamp para forzar la recarga de imágenes
-          setLastUpdate(Date.now());
         } else {
-          console.log('No hay datos en localStorage, usando menuData');
+          console.log('No hay datos en localStorage, usando menuData por defecto');
           setCategories(menuData);
           if (!selectedCategory) {
             setSelectedCategory(menuData[0]?.id || null);
           }
         }
+        // Actualizamos el timestamp para forzar la recarga de imágenes
+        setLastUpdate(Date.now());
       } catch (error) {
         console.error('Error cargando el menú:', error);
+        console.log('Usando menuData por defecto debido al error');
         setCategories(menuData);
         if (!selectedCategory) {
           setSelectedCategory(menuData[0]?.id || null);
@@ -55,9 +66,10 @@ const Menu = () => {
     };
 
     loadMenuData();
+    console.log('Estado actual de las categorías:', categories);
 
     // Configurar un intervalo para verificar actualizaciones
-    const intervalId = setInterval(loadMenuData, 2000); // Verificar cada 2 segundos
+    const intervalId = setInterval(loadMenuData, 2000);
 
     return () => clearInterval(intervalId);
   }, [selectedCategory]);

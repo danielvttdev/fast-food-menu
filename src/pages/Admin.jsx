@@ -131,13 +131,37 @@ const Admin = () => {
   };
 
   const handleSaveChanges = () => {
-    const menuDataWithTimestamp = {
-      timestamp: Date.now(),
-      data: categories
-    };
-    localStorage.setItem('menuData', JSON.stringify(menuDataWithTimestamp));
-    setHasUnsavedChanges(false);
-    alert('Cambios guardados exitosamente');
+    try {
+      console.log('Guardando cambios...');
+      console.log('Categorías a guardar:', categories);
+      
+      // Validar que los datos sean correctos antes de guardar
+      if (!Array.isArray(categories) || categories.length === 0) {
+        throw new Error('Los datos no son válidos');
+      }
+
+      // Crear objeto con timestamp y datos
+      const menuDataToSave = {
+        timestamp: Date.now(),
+        data: categories
+      };
+
+      // Guardar en localStorage
+      localStorage.setItem('menuData', JSON.stringify(menuDataToSave));
+      
+      // Verificar que se guardó correctamente
+      const savedData = localStorage.getItem('menuData');
+      if (!savedData) {
+        throw new Error('Los datos no se guardaron correctamente');
+      }
+
+      console.log('Cambios guardados exitosamente');
+      setHasUnsavedChanges(false);
+      alert('Cambios guardados exitosamente');
+    } catch (error) {
+      console.error('Error al guardar los cambios:', error);
+      alert('Error al guardar los cambios. Por favor, intente nuevamente.');
+    }
   };
 
   const handleUpdateImage = (categoryId, itemId, newImageUrl) => {
@@ -207,6 +231,34 @@ const Admin = () => {
   return (
     <div className="admin-container">
       <h1>Panel de Administración <span className="version-label">v0.1 Beta</span></h1>
+      <div className="admin-header-controls">
+        <button 
+          className="export-data-button"
+          onClick={() => {
+            try {
+              const menuDataToExport = {
+                timestamp: Date.now(),
+                data: categories
+              };
+              const dataStr = JSON.stringify(menuDataToExport, null, 2);
+              const dataBlob = new Blob([dataStr], { type: 'application/json' });
+              const url = URL.createObjectURL(dataBlob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'menuData.js';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            } catch (error) {
+              console.error('Error exportando datos:', error);
+              alert('Error al exportar los datos');
+            }
+          }}
+        >
+          📤 Exportar Datos
+        </button>
+      </div>
       <div className="admin-content">
         <div className="categories-list">
           {categories.map(category => (
