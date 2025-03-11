@@ -12,6 +12,26 @@ const DEFAULT_IMAGE = `data:image/svg+xml,${encodeURIComponent(`
   <text x="150" y="170" font-family="Arial" font-size="14" fill="#FFFFFF" text-anchor="middle">Imagen no disponible</text>
 </svg>`)}`;
 
+// Función para convertir enlaces de Google Drive en enlaces directos
+const getGoogleDriveDirectLink = (url) => {
+  try {
+    // Si es un enlace de visualización de Google Drive
+    if (url.includes('drive.google.com/file/d/')) {
+      const fileId = url.split('/file/d/')[1].split('/')[0];
+      return `https://drive.google.com/uc?export=view&id=${fileId}`;
+    }
+    // Si ya es un enlace directo, lo devolvemos tal cual
+    if (url.includes('drive.google.com/uc?')) {
+      return url;
+    }
+    // Si es cualquier otro tipo de enlace, lo devolvemos sin modificar
+    return url;
+  } catch (error) {
+    console.error('Error procesando URL de Google Drive:', error);
+    return url;
+  }
+};
+
 const Admin = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -131,83 +151,90 @@ const Admin = () => {
   };
 
   const handleSaveChanges = () => {
-    try {
-      console.log('Guardando cambios...');
-      console.log('Categorías a guardar:', categories);
-      
-      // Validar que los datos sean correctos antes de guardar
-      if (!Array.isArray(categories) || categories.length === 0) {
-        throw new Error('Los datos no son válidos');
-      }
-
-      // Crear objeto con timestamp y datos
-      const menuDataToSave = {
-        timestamp: Date.now(),
-        data: categories
-      };
-
-      // Guardar en localStorage
-      localStorage.setItem('menuData', JSON.stringify(menuDataToSave));
-      
-      // Verificar que se guardó correctamente
-      const savedData = localStorage.getItem('menuData');
-      if (!savedData) {
-        throw new Error('Los datos no se guardaron correctamente');
-      }
-
-      console.log('Cambios guardados exitosamente');
-      setHasUnsavedChanges(false);
-      alert('Cambios guardados exitosamente');
-    } catch (error) {
-      console.error('Error al guardar los cambios:', error);
-      alert('Error al guardar los cambios. Por favor, intente nuevamente.');
-    }
+    const menuDataWithTimestamp = {
+      timestamp: Date.now(),
+      data: categories
+    };
+    localStorage.setItem('menuData', JSON.stringify(menuDataWithTimestamp));
+    setHasUnsavedChanges(false);
+    alert('Cambios guardados exitosamente');
   };
 
-  const handleUpdateImage = (categoryId, itemId, newImageUrl) => {
-    if (!isValidImageUrl(newImageUrl)) {
-      alert('Por favor ingrese una URL de imagen válida');
-      return;
-    }
-
-    setCategories(prevCategories => {
-      const newCategories = prevCategories.map(category => {
-        if (category.id === categoryId) {
-          return {
-            ...category,
-            items: category.items.map(item => {
-              if (item.id === itemId) {
-                // Ensure the URL is properly formatted and add a stronger cache-busting mechanism
-                const timestamp = Date.now();
-                // Remove any existing cache-busting parameters
-                let cleanUrl = newImageUrl;
-                if (cleanUrl.includes('?')) {
-                  const urlParts = cleanUrl.split('?');
-                  cleanUrl = urlParts[0];
-                }
-                // Add a new cache-busting parameter
-                const imageUrl = `${cleanUrl}?t=${timestamp}`;
-                console.log('Updated image URL:', imageUrl);
-                return { ...item, image: imageUrl };
-              }
-              return item;
-            })
-          };
+  const handleImageUpload = async (categoryId, itemId, file) => {
+    if (file) {
+      try {
+        if (!file.type.startsWith('image/')) {
+          alert('Por favor selecciona una imagen válida');
+          return;
         }
-        return category;
-      });
-      setHasUnsavedChanges(true);
-      return newCategories;
-    });
+
+        if (file.size > 2 * 1024 * 1024) { // 2MB máximo
+          alert('La imagen es demasiado grande. El tamaño máximo es 2MB');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Image = e.target.result;
+          setCategories(prevCategories => {
+            const newCategories = prevCategories.map(category => {
+              if (category.id === categoryId) {
+                return {
+                  ...category,
+                  items: category.items.map(item => {
+                    if (item.id === itemId) {
+                      return { ...item, image: base64Image };
+                    }
+                    return item;
+                  })
+                };
+              }
+              return category;
+            });
+            setHasUnsavedChanges(true);
+            return newCategories;
+          });
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error al procesar la imagen:', error);
+        alert('Error al procesar la imagen. Por favor intenta de nuevo.');
+      }
+    }
   };
 
-  const isValidImageUrl = (url) => {
+  const handleUpdateImage = async (categoryId, itemId, imageUrl) => {
     try {
-      const parsedUrl = new URL(url);
-      const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-      return validExtensions.some(ext => parsedUrl.pathname.toLowerCase().endsWith(ext));
-    } catch {
-      return false;
+      // Convertir el enlace de Google Drive si es necesario
+      const directImageUrl = getGoogleDriveDirectLink(imageUrl);
+      
+      // Intentar cargar la imagen
+      const response = await fetch(directImageUrl);
+      if (!response.ok) {
+        throw new Error('No se pudo cargar la imagen');
+      }
+
+      setCategories(prevCategories => {
+        const newCategories = prevCategories.map(category => {
+          if (category.id === categoryId) {
+            return {
+              ...category,
+              items: category.items.map(item => {
+                if (item.id === itemId) {
+                  return { ...item, image: directImageUrl };
+                }
+                return item;
+              })
+            };
+          }
+          return category;
+        });
+        setHasUnsavedChanges(true);
+        return newCategories;
+      });
+    } catch (error) {
+      console.error('Error al cargar la imagen:', error);
+      alert('Error al cargar la imagen. Asegúrate de que la URL sea válida y accesible.');
     }
   };
 
@@ -231,34 +258,6 @@ const Admin = () => {
   return (
     <div className="admin-container">
       <h1>Panel de Administración <span className="version-label">v0.1 Beta</span></h1>
-      <div className="admin-header-controls">
-        <button 
-          className="export-data-button"
-          onClick={() => {
-            try {
-              const menuDataToExport = {
-                timestamp: Date.now(),
-                data: categories
-              };
-              const dataStr = JSON.stringify(menuDataToExport, null, 2);
-              const dataBlob = new Blob([dataStr], { type: 'application/json' });
-              const url = URL.createObjectURL(dataBlob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = 'menuData.js';
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(url);
-            } catch (error) {
-              console.error('Error exportando datos:', error);
-              alert('Error al exportar los datos');
-            }
-          }}
-        >
-          📤 Exportar Datos
-        </button>
-      </div>
       <div className="admin-content">
         <div className="categories-list">
           {categories.map(category => (

@@ -10,6 +10,26 @@ const DEFAULT_IMAGE = `data:image/svg+xml,${encodeURIComponent(`
   <text x="150" y="170" font-family="Arial" font-size="14" fill="#FFFFFF" text-anchor="middle">Imagen no disponible</text>
 </svg>`)}`;
 
+// Función para convertir enlaces de Google Drive en enlaces directos
+const getGoogleDriveDirectLink = (url) => {
+  try {
+    // Si es un enlace de visualización de Google Drive
+    if (url.includes('drive.google.com/file/d/')) {
+      const fileId = url.split('/file/d/')[1].split('/')[0];
+      return `https://drive.google.com/uc?export=view&id=${fileId}`;
+    }
+    // Si ya es un enlace directo, lo devolvemos tal cual
+    if (url.includes('drive.google.com/uc?')) {
+      return url;
+    }
+    // Si es cualquier otro tipo de enlace, lo devolvemos sin modificar
+    return url;
+  } catch (error) {
+    console.error('Error procesando URL de Google Drive:', error);
+    return url;
+  }
+};
+
 const AddMenuItem = ({ categoryId, onAddItem }) => {
   const [newItem, setNewItem] = useState({
     name: '',
@@ -25,23 +45,19 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
       return;
     }
 
-    // Validate image URL if provided
-    if (newItem.image && !isValidImageUrl(newItem.image)) {
-      alert('Por favor ingrese una URL de imagen válida');
-      return;
-    }
+    const imageUrl = newItem.image ? getGoogleDriveDirectLink(newItem.image) : DEFAULT_IMAGE;
 
     const itemToAdd = {
       ...newItem,
-      id: Date.now(), // Generar un ID único
+      id: Date.now(),
       price: Number(newItem.price),
       isPromo: false,
       isHidden: false,
-      image: newItem.image || DEFAULT_IMAGE
+      image: imageUrl
     };
 
     onAddItem(categoryId, itemToAdd);
-    setNewItem({ name: '', description: '', price: '', image: '' }); // Limpiar el formulario
+    setNewItem({ name: '', description: '', price: '', image: '' });
   };
 
   const isValidImageUrl = (url) => {
@@ -51,6 +67,28 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
       return validExtensions.some(ext => parsedUrl.pathname.toLowerCase().endsWith(ext));
     } catch {
       return false;
+    }
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor selecciona una imagen válida');
+        return;
+      }
+
+      if (file.size > 2 * 1024 * 1024) { // 2MB máximo
+        alert('La imagen es demasiado grande. El tamaño máximo es 2MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64Image = e.target.result;
+        setNewItem(prev => ({ ...prev, image: base64Image }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -98,9 +136,11 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
             id="image"
             value={newItem.image}
             onChange={(e) => setNewItem(prev => ({ ...prev, image: e.target.value }))}
-            placeholder="https://ejemplo.com/imagen.jpg"
+            placeholder="https://drive.google.com/file/d/..."
           />
-          <small className="form-help">Ingrese la URL de una imagen (formatos: jpg, jpeg, png, gif, webp)</small>
+          <small className="form-help">
+            Pegue el enlace de compartir de Google Drive (el enlace debe ser público)
+          </small>
         </div>
 
         <button type="submit" className="add-item-btn">
