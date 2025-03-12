@@ -243,28 +243,17 @@ const Admin = () => {
         alert('Error al subir la imagen. Por favor intenta de nuevo o usa una URL directa.');
       }
     }
-  };
-                  ...category,
-                  items: category.items.map(item => {
-                    if (item.id === itemId) {
-                      return { ...item, image: base64Image };
-                    }
-                    return item;
-                  })
-                };
-              }
-              return category;
-            });
-            setHasUnsavedChanges(true);
-            return newCategories;
-          });
-        };
-        reader.readAsDataURL(file);
-      } catch (error) {
-        console.error('Error al procesar la imagen:', error);
-        alert('Error al procesar la imagen. Por favor intenta de nuevo.');
-      }
-    }
+  };                  // End of handleImageUpload
+
+  const handleSave = async () => {
+    const menuDataWithTimestamp = {
+      timestamp: Date.now(),
+      data: categories
+    };
+    localStorage.setItem('menuData', JSON.stringify(menuDataWithTimestamp));
+    setHasUnsavedChanges(false);
+    setLastUpdate(Date.now());
+    alert('Cambios guardados exitosamente');
   };
 
   const handleUpdateImage = async (categoryId, itemId, imageUrl) => {
