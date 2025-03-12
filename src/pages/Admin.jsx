@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import '../styles/Admin.css';
 import AddMenuItem from '../components/AddMenuItem';
 import menuData from '../data/menuData';
+import { uploadToImgBB, fileToBase64 } from '../utils/imgbbUploader';
 
 // URL de la imagen por defecto (compartida con Menu.jsx)
 const DEFAULT_IMAGE = `data:image/svg+xml,${encodeURIComponent(`
@@ -191,13 +192,58 @@ const Admin = () => {
           return;
         }
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64Image = e.target.result;
+        // Primero mostramos la imagen localmente para feedback inmediato
+        const base64Image = await fileToBase64(file);
+        setCategories(prevCategories => {
+          const newCategories = prevCategories.map(category => {
+            if (category.id === categoryId) {
+              return {
+                ...category,
+                items: category.items.map(item => {
+                  if (item.id === itemId) {
+                    return { ...item, image: base64Image };
+                  }
+                  return item;
+                })
+              };
+            }
+            return category;
+          });
+          setHasUnsavedChanges(true);
+          return newCategories;
+        });
+
+        // Luego subimos a ImgBB usando la API key configurada en imgbbUploader.js
+        const result = await uploadToImgBB(file);
+        
+        if (result.success) {
+          // Actualizamos con la URL permanente
           setCategories(prevCategories => {
             const newCategories = prevCategories.map(category => {
               if (category.id === categoryId) {
                 return {
+                  ...category,
+                  items: category.items.map(item => {
+                    if (item.id === itemId) {
+                      return { ...item, image: result.url };
+                    }
+                    return item;
+                  })
+                };
+              }
+              return category;
+            });
+            setHasUnsavedChanges(true);
+            return newCategories;
+          });
+          console.log('Imagen subida exitosamente a ImgBB:', result.url);
+        }
+      } catch (error) {
+        console.error('Error al subir la imagen:', error);
+        alert('Error al subir la imagen. Por favor intenta de nuevo o usa una URL directa.');
+      }
+    }
+  };
                   ...category,
                   items: category.items.map(item => {
                     if (item.id === itemId) {

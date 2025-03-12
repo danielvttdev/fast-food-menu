@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
+import { uploadToImgBB, fileToBase64 } from '../utils/imgbbUploader';
 
 // URL de la imagen por defecto (compartida con Menu.jsx y Admin.jsx)
 const DEFAULT_IMAGE = `data:image/svg+xml,${encodeURIComponent(`
@@ -74,7 +75,7 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
     }
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
@@ -87,12 +88,23 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Image = e.target.result;
+      try {
+        // Primero mostramos la imagen localmente para feedback inmediato
+        const base64Image = await fileToBase64(file);
         setNewItem(prev => ({ ...prev, image: base64Image }));
-      };
-      reader.readAsDataURL(file);
+        
+        // Luego subimos a ImgBB usando la API key configurada en imgbbUploader.js
+        const result = await uploadToImgBB(file);
+        
+        if (result.success) {
+          // Actualizamos con la URL permanente
+          setNewItem(prev => ({ ...prev, image: result.url }));
+          console.log('Imagen subida exitosamente a ImgBB:', result.url);
+        }
+      } catch (error) {
+        console.error('Error al subir la imagen:', error);
+        alert('Error al subir la imagen. Por favor intenta de nuevo o usa una URL directa.');
+      }
     }
   };
 
@@ -144,8 +156,20 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
           />
           <small className="form-help">
             Ingrese una URL directa de imagen (debe terminar en .jpg, .jpeg, .png o .gif)<br />
-            Puede usar servicios como ImgBB, Imgur o Postimages para subir sus imágenes
+            O suba una imagen directamente usando el botón de abajo
           </small>
+          <div className="image-upload-container">
+            <input
+              type="file"
+              id="imageUpload"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="image-upload-input"
+            />
+            <label htmlFor="imageUpload" className="image-upload-button">
+              Subir imagen a ImgBB
+            </label>
+          </div>
         </div>
 
         <button type="submit" className="add-item-btn">
