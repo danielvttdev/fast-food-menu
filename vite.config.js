@@ -1,22 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
-import versionPlugin from './vite-plugin-version'
 
 // Generate a timestamp for cache busting
 const timestamp = new Date().getTime();
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), versionPlugin()],
+  plugins: [react()],
   base: '/',
   server: {
-    headers: {
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0',
-      'Access-Control-Allow-Origin': '*'
-    }
+    port: 5173,
+    strictPort: false,
+    open: true
   },
   preview: {
     headers: {

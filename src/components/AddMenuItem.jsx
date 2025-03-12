@@ -45,7 +45,11 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
       return;
     }
 
-    const imageUrl = newItem.image ? getGoogleDriveDirectLink(newItem.image) : DEFAULT_IMAGE;
+    // Validar la URL de la imagen si se proporciona una
+    if (newItem.image && !newItem.image.match(/\.(jpeg|jpg|gif|png)$/i)) {
+      alert('Por favor ingrese una URL directa de imagen que termine en .jpg, .jpeg, .png o .gif');
+      return;
+    }
 
     const itemToAdd = {
       ...newItem,
@@ -53,7 +57,7 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
       price: Number(newItem.price),
       isPromo: false,
       isHidden: false,
-      image: imageUrl
+      image: newItem.image || DEFAULT_IMAGE
     };
 
     onAddItem(categoryId, itemToAdd);
@@ -136,10 +140,11 @@ const AddMenuItem = ({ categoryId, onAddItem }) => {
             id="image"
             value={newItem.image}
             onChange={(e) => setNewItem(prev => ({ ...prev, image: e.target.value }))}
-            placeholder="https://drive.google.com/file/d/..."
+            placeholder="https://ejemplo.com/imagen.jpg"
           />
           <small className="form-help">
-            Pegue el enlace de compartir de Google Drive (el enlace debe ser público)
+            Ingrese una URL directa de imagen (debe terminar en .jpg, .jpeg, .png o .gif)<br />
+            Puede usar servicios como ImgBB, Imgur o Postimages para subir sus imágenes
           </small>
         </div>
 

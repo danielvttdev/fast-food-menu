@@ -38,25 +38,42 @@ const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
 
   useEffect(() => {
     // Cargar el menú desde localStorage si existe
-    const savedMenu = localStorage.getItem('menuData');
-    if (savedMenu) {
-      const parsedMenu = JSON.parse(savedMenu);
-      const menuData = parsedMenu.data || parsedMenu; // Handle both new and old format
-      setCategories(menuData);
-      // Seleccionar la primera categoría por defecto
-      if (menuData.length > 0) {
-        setSelectedCategory(menuData[0].id);
+    const loadMenuData = () => {
+      try {
+        const savedMenu = localStorage.getItem('menuData');
+        if (savedMenu) {
+          const parsedMenu = JSON.parse(savedMenu);
+          const menuData = parsedMenu.data || parsedMenu; // Handle both new and old format
+          setCategories(menuData);
+          // Seleccionar la primera categoría por defecto
+          if (menuData.length > 0) {
+            setSelectedCategory(menuData[0].id);
+          }
+          setLastUpdate(Date.now());
+        } else {
+          console.log('No hay datos en localStorage, usando menuData por defecto');
+          setCategories(menuData);
+          if (menuData.length > 0) {
+            setSelectedCategory(menuData[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando el menú:', error);
+        setCategories(menuData);
+        if (menuData.length > 0) {
+          setSelectedCategory(menuData[0].id);
+        }
       }
-    } else {
-      // Si no hay datos en localStorage, usar el menú por defecto
-      setCategories(menuData);
-      if (menuData.length > 0) {
-        setSelectedCategory(menuData[0].id);
-      }
-    }
+    };
+
+    loadMenuData();
+    // Configurar un intervalo para verificar actualizaciones
+    const intervalId = setInterval(loadMenuData, 2000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const handleLogin = (e) => {
@@ -157,6 +174,7 @@ const Admin = () => {
     };
     localStorage.setItem('menuData', JSON.stringify(menuDataWithTimestamp));
     setHasUnsavedChanges(false);
+    setLastUpdate(Date.now());
     alert('Cambios guardados exitosamente');
   };
 
@@ -205,36 +223,35 @@ const Admin = () => {
 
   const handleUpdateImage = async (categoryId, itemId, imageUrl) => {
     try {
-      // Convertir el enlace de Google Drive si es necesario
-      const directImageUrl = getGoogleDriveDirectLink(imageUrl);
-      
-      // Intentar cargar la imagen
-      const response = await fetch(directImageUrl);
-      if (!response.ok) {
-        throw new Error('No se pudo cargar la imagen');
+      // Si es una URL directa, intentamos usarla primero
+      if (imageUrl.match(/\.(jpeg|jpg|gif|png)$/i)) {
+        setCategories(prevCategories => {
+          const newCategories = prevCategories.map(category => {
+            if (category.id === categoryId) {
+              return {
+                ...category,
+                items: category.items.map(item => {
+                  if (item.id === itemId) {
+                    return { ...item, image: imageUrl };
+                  }
+                  return item;
+                })
+              };
+            }
+            return category;
+          });
+          setHasUnsavedChanges(true);
+          return newCategories;
+        });
+        return;
       }
 
-      setCategories(prevCategories => {
-        const newCategories = prevCategories.map(category => {
-          if (category.id === categoryId) {
-            return {
-              ...category,
-              items: category.items.map(item => {
-                if (item.id === itemId) {
-                  return { ...item, image: directImageUrl };
-                }
-                return item;
-              })
-            };
-          }
-          return category;
-        });
-        setHasUnsavedChanges(true);
-        return newCategories;
-      });
+      // Si no es una URL directa, mostramos un mensaje al usuario
+      alert('Por favor usa una URL directa de imagen que termine en .jpg, .jpeg, .png o .gif\n\nPuedes usar servicios como:\n- ImgBB (https://imgbb.com)\n- Imgur (https://imgur.com)\n- Postimages (https://postimages.org)');
+      
     } catch (error) {
-      console.error('Error al cargar la imagen:', error);
-      alert('Error al cargar la imagen. Asegúrate de que la URL sea válida y accesible.');
+      console.error('Error al actualizar la imagen:', error);
+      alert('Error al actualizar la imagen. Por favor verifica que la URL sea válida y accesible.');
     }
   };
 
@@ -274,41 +291,48 @@ const Admin = () => {
         <div className="items-list">
           {selectedCategory && (
             <>
+              <div className="upload-instructions">
+                <h4>📸 Instrucciones para subir imágenes:</h4>
+                <ol>
+                  <li>Ve a <a href="https://imgbb.com" target="_blank" rel="noopener noreferrer">ImgBB.com</a></li>
+                  <li>Haz clic en "Start uploading" y sube tu imagen</li>
+                  <li>Copia la "Direct link" (URL directa)</li>
+                  <li>Pega la URL en el campo de imagen del producto</li>
+                </ol>
+              </div>
               <AddMenuItem
                 categoryId={selectedCategory}
                 onAddItem={(categoryId, newItem) => {
-                  setCategories(prevCategories => {
-                    const newCategories = prevCategories.map(category => {
-                      if (category.id === categoryId) {
-                        return {
-                          ...category,
-                          items: [...category.items, newItem]
-                        };
-                      }
-                      return category;
-                    });
-                    setHasUnsavedChanges(true);
-                    return newCategories;
-                  });
+            setCategories(prevCategories => {
+              const newCategories = prevCategories.map(category => {
+                if (category.id === categoryId) {
+                  return {
+                    ...category,
+                    items: [...category.items, newItem]
+                  };
+                }
+                return category;
+              });
+              setHasUnsavedChanges(true);
+              return newCategories;
+            });
                 }}
               />
-              {categories
-                .find(cat => cat.id === selectedCategory)
-                ?.items.map(item => (
-                  <div key={item.id} className={`admin-item ${item.isHidden ? 'hidden' : ''}`}>
-                    <div className="image-container">
+          {categories
+            .find(cat => cat.id === selectedCategory)
+            ?.items.map(item => (
+              <div key={item.id} className={`admin-item ${item.isHidden ? 'hidden' : ''}`}>
+                <div className="image-container">
                       <img
-                        src={item.image || DEFAULT_IMAGE}
+                        src={item.image ? getGoogleDriveDirectLink(item.image) : DEFAULT_IMAGE}
                         alt={item.name}
-                        onError={(e) => {
-                          console.log(`Error cargando imagen para ${item.name}, usando imagen por defecto`);
-                          e.target.onerror = null;
-                          e.target.src = DEFAULT_IMAGE;
-                        }}
+                        onError={(e) => handleImageError(e, item.name)}
+                        loading="lazy"
+                        key={`${item.image}-${lastUpdate}`}
                       />
-                      <div className="image-upload">
+                  <div className="image-upload">
                         <div className="url-input-container">
-                          <input
+                      <input
                             type="url"
                             placeholder="https://ejemplo.com/imagen.jpg"
                             className="image-url-input"
@@ -316,55 +340,55 @@ const Admin = () => {
                               if (e.key === 'Enter') {
                                 handleUpdateImage(selectedCategory, item.id, e.target.value);
                                 e.target.value = '';
-                              }
-                            }}
-                          />
+                          }
+                        }}
+                      />
                           <small className="url-help">Presiona Enter para actualizar la imagen</small>
                         </div>
-                      </div>
+                  </div>
+                </div>
+                <div className="item-details">
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
+                  <div className="price-promo-controls">
+                    <div className="price-control">
+                      <label>Precio:</label>
+                      <input
+                        type="number"
+                        value={item.price}
+                        onChange={(e) => handleUpdatePrice(selectedCategory, item.id, e.target.value)}
+                      />
                     </div>
-                    <div className="item-details">
-                      <h3>{item.name}</h3>
-                      <p>{item.description}</p>
-                      <div className="price-promo-controls">
-                        <div className="price-control">
-                          <label>Precio:</label>
-                          <input
-                            type="number"
-                            value={item.price}
-                            onChange={(e) => handleUpdatePrice(selectedCategory, item.id, e.target.value)}
-                          />
-                        </div>
-                        <div className="promo-control">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={item.isPromo}
-                              onChange={() => handleTogglePromo(selectedCategory, item.id)}
-                            />
-                            Promoción
-                          </label>
-                        </div>
-                      </div>
-                      <div className="admin-controls">
-                        <button
-                          className="admin-btn hide"
-                          onClick={() => handleToggleHideItem(selectedCategory, item.id)}
-                          title={item.isHidden ? "Mostrar producto" : "Ocultar producto"}
-                        >
-                          {item.isHidden ? '👁️' : '👁️‍🗨️'}
-                        </button>
-                        <button
-                          className="admin-btn delete"
-                          onClick={() => handleDeleteItem(selectedCategory, item.id)}
-                          title="Eliminar producto"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                    <div className="promo-control">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={item.isPromo}
+                          onChange={() => handleTogglePromo(selectedCategory, item.id)}
+                        />
+                        Promoción
+                      </label>
                     </div>
                   </div>
-                ))}
+                  <div className="admin-controls">
+                    <button
+                      className="admin-btn hide"
+                      onClick={() => handleToggleHideItem(selectedCategory, item.id)}
+                      title={item.isHidden ? "Mostrar producto" : "Ocultar producto"}
+                    >
+                      {item.isHidden ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                    <button
+                      className="admin-btn delete"
+                      onClick={() => handleDeleteItem(selectedCategory, item.id)}
+                      title="Eliminar producto"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
             </>
           )}
         </div>

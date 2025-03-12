@@ -12,6 +12,26 @@ const DEFAULT_IMAGE = `data:image/svg+xml,${encodeURIComponent(`
   <text x="150" y="170" font-family="Arial" font-size="14" fill="#FFFFFF" text-anchor="middle">Imagen no disponible</text>
 </svg>`)}`;
 
+// Función para convertir enlaces de Google Drive en enlaces directos
+const getGoogleDriveDirectLink = (url) => {
+  try {
+    // Si es un enlace de visualización de Google Drive
+    if (url.includes('drive.google.com/file/d/')) {
+      const fileId = url.split('/file/d/')[1].split('/')[0];
+      return `https://drive.google.com/uc?export=view&id=${fileId}`;
+    }
+    // Si ya es un enlace directo, lo devolvemos tal cual
+    if (url.includes('drive.google.com/uc?')) {
+      return url;
+    }
+    // Si es cualquier otro tipo de enlace, lo devolvemos sin modificar
+    return url;
+  } catch (error) {
+    console.error('Error procesando URL de Google Drive:', error);
+    return url;
+  }
+};
+
 const Menu = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -132,11 +152,11 @@ const Menu = () => {
             <div key={item.id} className="menu-item">
               <div className="item-image">
                 <img 
-                  src={item.image || DEFAULT_IMAGE}
+                  src={item.image ? getGoogleDriveDirectLink(item.image) : DEFAULT_IMAGE}
                   alt={item.name}
                   onError={(e) => handleImageError(e, item.name)}
                   loading="lazy"
-                  key={item.image} // Forzar re-render cuando cambia la imagen
+                  key={`${item.image}-${lastUpdate}`} // Forzar re-render cuando cambia la imagen o hay una actualización
                 />
                 {item.isPromo && <span className="promo-badge">Promo</span>}
               </div>
